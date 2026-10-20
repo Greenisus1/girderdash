@@ -26,6 +26,10 @@ Python 3 with curses. No dependencies, no network, no install. Saves your best s
 - Falling through a gap just drops you to the girder below - unless it's the bottom one.
 - Towers grow from 3 girders up to 7, with faster spawns every level.
 
+## Languages
+
+Works with the Translations app: pick a language there and this game's HUD, overlays and help text switch to it (English, Espanol, Francais, Deutsch). With no Translations app installed it runs in English as usual.
+
 ## Tests
 
 ```
