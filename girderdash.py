@@ -30,6 +30,24 @@ BEACON_SCORE = 100
 # color ids (shared by render grid and curses paint)
 C_FLOOR, C_LADDER, C_PLAYER, C_BARREL, C_GOAL, C_TEXT, C_ACCENT, C_DIM, C_BOT = range(1, 10)
 
+try:
+    import pi18n
+except ImportError:
+    pi18n = None
+
+# English UI strings; the Translations app owns every language via ~/pi-translations.
+DEFAULT_STRINGS = {
+    "TITLE": "GIRDERDASH",
+    "HUD": "LEVEL {level}  LIVES {lives}  SCORE {score}  BEST {best}",
+    "CONTROLS": "arrows/wasd move · space jump · p pause · q quit",
+    "OUCH": " OUCH! ",
+    "CLEAR": " BEACON LIT! TOWER CLEAR ",
+    "CLEAR_SUB": " enter: next tower · q: quit ",
+    "OVER": " TOWER WINS ",
+    "OVER_SUB": " score {score} · enter: retry · q: quit ",
+    "TOO_SMALL": "girderdash needs a terminal at least {w}x{h} (yours is {ww}x{hh}).",
+}
+
 # ---------- mechanics (pure, unit-testable) ----------
 
 class World:
@@ -250,8 +268,9 @@ def best():
         return 0
 
 # ---------- render (pure grid) ----------
-def render(w, W, H):
+def render(w, W, H, S=None):
     """Return (chars, colors) HxW grids for the current world state."""
+    S = S or DEFAULT_STRINGS
     ch = [[" "] * W for _ in range(H)]
     co = [[0] * W for _ in range(H)]
     def put(x, y, c, k):
@@ -289,23 +308,23 @@ def render(w, W, H):
     put(ox + w.px, y, pc, C_PLAYER)
 
     # HUD
-    text(1, 0, "GIRDERDASH", C_ACCENT)
-    text(14, 0, f"LEVEL {w.level}  LIVES {max(w.lives,0)}  SCORE {w.score}  BEST {max(best(), w.score)}", C_TEXT)
-    text(1, H - 1, "arrows/wasd move · space jump · p pause · q quit", C_DIM)
+    text(1, 0, S["TITLE"], C_ACCENT)
+    text(14, 0, S["HUD"].format(level=w.level, lives=max(w.lives, 0), score=w.score, best=max(best(), w.score)), C_TEXT)
+    text(1, H - 1, S["CONTROLS"], C_DIM)
     if w.state == "dead":
-        text(W // 2 - 7, H // 2, " OUCH! ", C_BARREL)
+        text(W // 2 - 7, H // 2, S["OUCH"], C_BARREL)
     elif w.state == "clear":
-        text(W // 2 - 12, H // 2, " BEACON LIT! TOWER CLEAR ", C_GOAL)
-        text(W // 2 - 13, H // 2 + 1, " enter: next tower · q: quit ", C_TEXT)
+        text(W // 2 - 12, H // 2, S["CLEAR"], C_GOAL)
+        text(W // 2 - 13, H // 2 + 1, S["CLEAR_SUB"], C_TEXT)
     elif w.state == "gameover":
-        text(W // 2 - 9, H // 2, " TOWER WINS ", C_BARREL)
-        text(W // 2 - 15, H // 2 + 1, f" score {w.score} · enter: retry · q: quit ", C_TEXT)
+        text(W // 2 - 9, H // 2, S["OVER"], C_BARREL)
+        text(W // 2 - 15, H // 2 + 1, S["OVER_SUB"].format(score=w.score), C_TEXT)
     return ch, co
 
 # ---------- curses front end ----------
-def paint(stdscr, w):
+def paint(stdscr, w, S=None):
     H, W = stdscr.getmaxyx()
-    ch, co = render(w, W, H)
+    ch, co = render(w, W, H, S)
     for y in range(H):
         for x in range(W - 1):
             c, k = ch[y][x], co[y][x]
@@ -334,9 +353,10 @@ KEYMAP = {curses.KEY_LEFT: "left", ord("a"): "left", curses.KEY_RIGHT: "right", 
           ord(" "): "jump"}
 
 def run(stdscr):
+    S = pi18n.load("girderdash", DEFAULT_STRINGS) if pi18n else DEFAULT_STRINGS
     H, W = stdscr.getmaxyx()
     if W < WW + 4 or H < 22:
-        stdscr.addstr(0, 0, f"girderdash needs a terminal at least {WW+4}x22 (yours is {W}x{H}).")
+        stdscr.addstr(0, 0, S["TOO_SMALL"].format(w=WW + 4, h=22, ww=W, hh=H))
         stdscr.refresh(); stdscr.getch(); return
     init_colors()
     curses.curs_set(0)
@@ -369,7 +389,7 @@ def run(stdscr):
         if jump_edge: actions.add("jump")
         if not paused and w.state not in ("clear", "gameover"):
             w.step(actions)
-        paint(stdscr, w)
+        paint(stdscr, w, S)
         time.sleep(0.06)
 
 def main():
