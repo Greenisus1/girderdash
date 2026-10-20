@@ -1,7 +1,7 @@
 import json, os, pty, select, subprocess, sys, tempfile, time, unittest
 from pathlib import Path
 from unittest.mock import patch
-sys.path.insert(0, '/tmp/girderdash-pkg')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import girderdash as g
 
 def fresh(level=1, seed=7):
@@ -200,6 +200,24 @@ class RenderTests(unittest.TestCase):
         w = fresh(); w.state = "clear"
         ch, co = g.render(w, 80, 26)
         self.assertIn("BEACON LIT", "\n".join("".join(r) for r in ch))
+    def test_spanish_overlay(self):
+        import pi18n, tempfile, os, json
+        S = dict(g.DEFAULT_STRINGS)
+        S.update({"OUCH": " ¡AY! ", "CLEAR": " ¡BALIZA ENCENDIDA! TORRE SUPERADA "})
+        w = fresh(); w.state = "clear"
+        ch, co = g.render(w, 80, 26, S)
+        self.assertIn("BALIZA ENCENDIDA", "\n".join("".join(r) for r in ch))
+    def test_loader_wires_pack(self):
+        import pi18n, tempfile, os, json
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "language"), "w") as fh: fh.write("es")
+            with open(os.path.join(d, "girderdash.json"), "w") as fh:
+                json.dump({"lang": "es", "strings": {"OUCH": " ¡AY! "}}, fh)
+            from unittest.mock import patch
+            with patch.object(pi18n, "DIR", d):
+                S = pi18n.load("girderdash", g.DEFAULT_STRINGS)
+        self.assertEqual(S["OUCH"], " ¡AY! ")
+        self.assertEqual(S["TITLE"], "GIRDERDASH")
 
 class PtyTests(unittest.TestCase):
     def spawn(self, env_extra=None):
@@ -207,7 +225,7 @@ class PtyTests(unittest.TestCase):
         env = dict(os.environ, TERM="xterm-256color", LINES="30", COLUMNS="90",
                    GIRDERDASH_SEED="7")
         if env_extra: env.update(env_extra)
-        p = subprocess.Popen([sys.executable, "/tmp/girderdash-pkg/girderdash.py"],
+        p = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "girderdash.py")],
                              stdin=slave, stdout=slave, stderr=slave, env=env, close_fds=True)
         os.close(slave)
         return p, master, bytearray()
